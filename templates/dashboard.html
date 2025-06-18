@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>CallNowUsa - Dashboard</title>
+  <meta name="description" content="Your CallNowUsa dashboard" />
+  <meta name="theme-color" content="#090909" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background-color: #090909;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .menu-wrapper {
+      position: fixed;
+      top: 8.1px;
+      left: 8.1px;
+      z-index: 1100;
+    }
+
+    .hamburger {
+      font-size: 1.35rem;
+      cursor: pointer;
+      color: #ffffff;
+    }
+
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: -100%;
+      width: 80%;
+      max-width: 250px;
+      height: 100%;
+      background-color: #1a1a1a;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+      transition: left 0.3s ease;
+      z-index: 1000;
+      padding-top: 4.5rem;
+    }
+
+    .sidebar.active {
+      left: 0;
+    }
+
+    .sidebar ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .sidebar li {
+      padding: 0.9rem 1.35rem;
+    }
+
+    .sidebar a {
+      text-decoration: none;
+      color: #ffffff;
+      font-weight: 500;
+      display: block;
+    }
+
+    .sidebar a:hover {
+      color: #cccccc;
+    }
+
+    .navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 0.81rem 1.62rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: #1a1a1a;
+      z-index: 1001;
+    }
+
+    .brand-wrapper {
+      padding-left: 1.62rem;
+    }
+
+    .brand {
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1.0125rem;
+      color: #ffffff;
+    }
+
+    .nav-links a {
+      text-decoration: none;
+      font-weight: 500;
+      color: #ffffff;
+    }
+
+    .container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.4rem 0.6rem;
+      padding-top: 4.8rem;
+      position: relative;
+    }
+
+    .section {
+      width: 100%;
+      max-width: 324px;
+      background-color: #1a1a1a;
+      padding: 0.9rem;
+      border-radius: 6px;
+      box-shadow: 0 3px 9px rgba(0, 0, 0, 0.5);
+      margin-top: 5.9rem;
+      margin-bottom: 5.9rem;
+    }
+
+    .form-label {
+      display: block;
+      margin-bottom: 0.35rem;
+      font-weight: 500;
+      color: #ffffff;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 0.48rem;
+      margin-bottom: 0.7rem;
+      border: 1px solid #444;
+      border-radius: 6px;
+      font-size: 0.79rem;
+      background-color: #2a2a2a;
+      color: #ffffff;
+    }
+
+    .form-input[type="file"]::file-selector-button {
+      background-color: #333333;
+      color: #ffffff;
+      border: none;
+      padding: 0.35rem 0.7rem;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    .form-input[type="file"]::file-selector-button:hover {
+      background-color: #444444;
+    }
+
+    .btn {
+      display: inline-block;
+      width: 100%;
+      padding: 0.48rem;
+      font-size: 0.79rem;
+      font-weight: 600;
+      text-align: center;
+      color: #ffffff;
+      background-color: #333333;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .btn:hover:not(:disabled) {
+      background-color: #444444;
+    }
+
+    .btn:disabled {
+      background-color: #555555;
+      cursor: not-allowed;
+    }
+
+    #send-btn {
+      background-color: #007BFF;
+    }
+
+    #send-btn:hover:not(:disabled) {
+      background-color: #0056b3;
+    }
+
+    #send-btn:disabled {
+      background-color: #003c80;
+      cursor: not-allowed;
+    }
+
+    .flash-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 1400;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .flash-modal-content {
+      background-color: #1a1a1a;
+      color: #ffffff;
+      padding: 1.2rem;
+      border-radius: 6px;
+      max-width: 324px;
+      width: 90%;
+      box-shadow: 0 3px 9px rgba(0, 0, 0, 0.5);
+      text-align: center;
+    }
+
+    .flash-modal-content h3 {
+      margin-bottom: 0.7rem;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .flash-modal-content p {
+      margin-bottom: 0.9rem;
+      font-size: 0.8rem;
+    }
+
+    .flash-modal-content .btn {
+      width: auto;
+      padding: 0.35rem 1.4rem;
+    }
+
+    .flash-error {
+      border: 1px solid #dc3545;
+    }
+
+    .flash-success {
+      border: 1px solid #ffffff;
+    }
+
+    footer {
+      text-align: center;
+      padding: 0.7rem;
+      font-size: 0.7rem;
+      color: #cccccc;
+      background-color: #1a1a1a;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 1300;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-content {
+      background-color: #ffffff;
+      color: #000000;
+      padding: 1.4rem;
+      border-radius: 9px;
+      max-width: 405px;
+      width: 90%;
+      box-shadow: 0 3px 9px rgba(0, 0, 0, 0.5);
+      text-align: center;
+    }
+
+    .modal-content h3 {
+      margin-bottom: 0.7rem;
+    }
+
+    .modal-content .btn {
+      background-color: #333333;
+      color: #ffffff;
+      width: auto;
+      padding: 0.35rem 0.7rem;
+      margin: 0.35rem;
+    }
+
+    .modal-content .btn:hover {
+      background-color: #444444;
+    }
+
+    .file-link {
+      display: inline-block;
+      margin-top: 0.35rem;
+      font-size: 0.79rem;
+      color: #cccccc;
+      text-decoration: underline;
+    }
+
+    .file-link:hover {
+      color: #ffffff;
+    }
+
+    @media (max-width: 600px) {
+      .section, .flash-modal-content {
+        max-width: 90vw;
+      }
+
+      .navbar {
+        padding: 0.5rem 1rem;
+      }
+
+      .form-input, .btn {
+        font-size: 0.7rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="menu-wrapper">
+    <div class="hamburger" id="hamburger">☰</div>
+  </div>
+  <div class="sidebar" id="sidebar">
+    <ul>
+      <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+      <li><a href="{{ url_for('view_sms_status') }}">View Status of Sent SMS</a></li>
+      <li><a href="{{ url_for('sms_forwarding') }}">SMS Forwarding</a></li>
+      <li><a href="{{ url_for('inbox') }}">Inbox</a></li>
+    </ul>
+  </div>
+  <nav class="navbar">
+    <div class="brand-wrapper">
+      <a class="brand" href="{{ url_for('dashboard') }}">CallNowUsa</a>
+    </div>
+    <div class="nav-links">
+      <a href="{{ url_for('logout') }}">Log out</a>
+    </div>
+  </nav>
+  <main class="container">
+    <section class="section">
+      <h2 style="margin-bottom: 0.81rem;">Send Text Message</h2>
+      <form method="POST" action="{{ url_for('send_sms') }}" class="form" novalidate id="sms-form" enctype="multipart/form-data">
+        <label for="to_number" class="form-label">Recipient Phone Number:</label>
+        <input type="text" name="to_number" id="to_number" class="form-input" placeholder="+12345678901 or 12345678901" required />
+        <label for="file" class="form-label">Upload File (CSV or Excel):</label>
+        <input type="file" name="file" id="file" class="form-input" accept=".csv,.xlsx,.xls" />
+        <a href="{{ url_for('static', filename='example.csv') }}" class="file-link" download>Download example.csv</a>
+        <label for="message" class="form-label">Message:</label>
+        <textarea name="message" id="message" class="form-input" rows="4" placeholder="Enter your message" required></textarea>
+        <button type="submit" class="btn" id="send-btn">Send Text</button>
+      </form>
+      <!-- Hidden form for file upload -->
+      <form method="POST" action="{{ url_for('upload_sms') }}" enctype="multipart/form-data" id="upload-form" style="display: none;">
+        <input type="file" name="file" id="hidden-file" />
+      </form>
+    </section>
+    <div class="modal" id="file-modal">
+      <div class="modal-content">
+        <h3>Confirm File Upload</h3>
+        <p>Are you sure you want to upload this file for bulk SMS?</p>
+        <button type="button" class="btn" id="confirm-btn">Confirm</button>
+        <button type="button" class="btn" id="cancel-btn">Cancel</button>
+      </div>
+    </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-modal" id="flash-modal">
+          <div class="flash-modal-content flash-{{ messages[0][0] }}">
+            <h3>CallNowUsa</h3>
+            {% for category, message in messages %}
+              <p>{{ message }}</p>
+            {% endfor %}
+            <button class="btn" id="flash-close">Okay</button>
+          </div>
+        </div>
+      {% endif %}
+    {% endwith %}
+  </main>
+  <footer>
+    © 2025 CallNowUsa. All rights reserved.
+  </footer>
+  <script>
+    // Sidebar toggle
+    document.getElementById('hamburger').addEventListener('click', function() {
+      var sidebar = document.getElementById('sidebar');
+      sidebar.classList.toggle('active');
+    });
+
+    // Single SMS form submission feedback
+    document.getElementById('sms-form').addEventListener('submit', function(event) {
+      var sendBtn = document.getElementById('send-btn');
+      sendBtn.textContent = 'Sent';
+      sendBtn.disabled = true;
+      setTimeout(function() {
+        sendBtn.textContent = 'Send Text';
+        sendBtn.disabled = false;
+      }, 5000);
+    });
+
+    // Show flash modal if messages exist
+    var flashModal = document.getElementById('flash-modal');
+    if (flashModal) {
+      flashModal.style.display = 'flex';
+    }
+
+    // Close flash modal
+    var flashClose = document.getElementById('flash-close');
+    if (flashClose) {
+      flashClose.addEventListener('click', function() {
+        flashModal.style.display = 'none';
+      });
+    }
+
+    // Show confirmation modal when file is selected
+    document.getElementById('file').addEventListener('change', function(event) {
+      if (event.target.files.length > 0) {
+        var modal = document.getElementById('file-modal');
+        modal.style.display = 'flex';
+        // Populate hidden file input
+        var hiddenFileInput = document.getElementById('hidden-file');
+        hiddenFileInput.files = event.target.files;
+      }
+    });
+
+    // Submit upload form on confirm
+    document.getElementById('confirm-btn').addEventListener('click', function() {
+      var uploadForm = document.getElementById('upload-form');
+      var confirmBtn = document.getElementById('confirm-btn');
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Submitting...';
+      uploadForm.submit();
+      var modal = document.getElementById('file-modal');
+      modal.style.display = 'none';
+      document.getElementById('file').value = ''; // Clear main file input
+    });
+
+    // Hide modal on cancel
+    document.getElementById('cancel-btn').addEventListener('click', function() {
+      var modal = document.getElementById('file-modal');
+      modal.style.display = 'none';
+      document.getElementById('file').value = ''; // Clear main file input
+    });
+
+    // Close modal when clicking outside
+    document.getElementById('file-modal').addEventListener('click', function(event) {
+      if (event.target === this) {
+        this.style.display = 'none';
+        document.getElementById('file').value = ''; // Clear main file input
+      }
+    });
+  </script>
+</body>
+</html>

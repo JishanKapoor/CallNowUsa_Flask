@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>CallNowUsa - Select Phone Number</title>
+  <meta name="description" content="Select your CallNowUsa phone number" />
+  <meta name="theme-color" content="#090909" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="brand-wrapper">
+      <a class="brand" href="{{ url_for('dashboard') }}">CallNowUsa</a>
+    </div>
+    <div class="nav-links">
+      <a href="{{ url_for('logout') }}">Log out</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <div class="form-box">
+      <div class="form-title">Select Your Phone Number</div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <p class="flash-{{ category }}">{{ message }}</p>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <form method="POST" action="{{ url_for('select_phone') }}">
+        <label for="phone_number">Phone Number:</label>
+        <select name="phone_number" id="phone_number" required>
+          {% if phone_numbers %}
+            {% for number in phone_numbers %}
+              <option value="{{ number.id }}">{{ number.number }}</option>
+            {% endfor %}
+          {% else %}
+            <option value="" disabled selected>No Numbers Available</option>
+          {% endif %}
+        </select>
+        <button type="submit">Submit</button>
+      </form>
+    </div>
+  </main>
+
+  <footer>
+    © 2025 CallNowUsa. All rights reserved.
+  </footer>
+</body>
+</html>

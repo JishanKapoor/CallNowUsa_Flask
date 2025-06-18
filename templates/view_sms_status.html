@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>CallNowUsa - View SMS Status</title>
+  <meta name="description" content="View status of sent SMS messages" />
+  <meta name="theme-color" content="#090909" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background-color: #090909;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .menu-wrapper {
+      position: fixed;
+      top: 8.1px;
+      left: 8.1px;
+      z-index: 1100;
+    }
+
+    .hamburger {
+      font-size: 1.35rem;
+      cursor: pointer;
+      color: #ffffff;
+    }
+
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: -100%;
+      width: 80%;
+      max-width: 250px;
+      height: 100%;
+      background-color: #1a1a1a;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+      transition: left 0.3s ease;
+      z-index: 1000;
+      padding-top: 4.5rem;
+    }
+
+    .sidebar.active {
+      left: 0;
+    }
+
+    .sidebar ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .sidebar li {
+      padding: 0.9rem 1.35rem;
+    }
+
+    .sidebar a {
+      text-decoration: none;
+      color: #ffffff;
+      font-weight: 500;
+      display: block;
+    }
+
+    .sidebar a:hover {
+      color: #cccccc;
+    }
+
+    .navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 0.9rem 1.8rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: #1a1a1a;
+      z-index: 1001;
+    }
+
+    .brand-wrapper {
+      padding-left: 2.7rem;
+    }
+
+    .brand {
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1.125rem;
+      color: #ffffff;
+    }
+
+    .nav-links a {
+      text-decoration: none;
+      font-weight: 500;
+      color: #ffffff;
+    }
+
+    .container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 5.4rem 0.9rem 0 0.9rem;
+      min-height: calc(100vh - 5.4rem);
+    }
+
+    .section {
+      width: 100%;
+      max-width: 540px;
+      background-color: #1a1a1a;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      margin: 0 auto;
+      transform: scale(0.9);
+      transform-origin: top center;
+    }
+
+    .table-wrapper {
+      max-height: 400px;
+      overflow-y: auto;
+      width: 100%;
+      scrollbar-width: thin;
+      scrollbar-color: #007BFF #1a1a1a;
+    }
+
+    .table-wrapper::-webkit-scrollbar {
+      width: 8px;
+    }
+    .table-wrapper::-webkit-scrollbar-thumb {
+      background-color: #007BFF;
+      border-radius: 4px;
+      height: 50px; /* Adjust this value to make the thumb shorter */
+  }
+
+    .table-wrapper {
+      scrollbar-width: thin;
+      scrollbar-color: #007BFF #1a1a1a;
+      --scrollbar-thumb-height: 50px; /* Custom property for consistency */
+    }
+
+    .table-wrapper::-webkit-scrollbar-track {
+      background: #1a1a1a;
+    }
+
+    .table-wrapper::-webkit-scrollbar-thumb {
+      background-color: #007BFF;
+      border-radius: 4px;
+    }
+
+    .sms-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.9rem;
+    }
+
+    .sms-table th, .sms-table td {
+      padding: 0.675rem;
+      text-align: left;
+      border-bottom: 1px solid #444;
+    }
+
+    .sms-table th {
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    .sms-table td {
+      color: #cccccc;
+    }
+
+    .flash-messages {
+      width: 100%;
+      max-width: 540px;
+      margin-bottom: 0.9rem;
+    }
+
+    .flash {
+      padding: 0.75rem 1rem;
+      border-radius: 5px;
+      margin-bottom: 0.75rem;
+      font-weight: 500;
+      color: #ffffff;
+    }
+
+    .flash-success {
+      background-color: #000000;
+      border: 1px solid #ffffff;
+    }
+
+    .flash-error {
+      background-color: #dc3545;
+    }
+
+    footer {
+      text-align: center;
+      padding: 0.9rem;
+      font-size: 0.81rem;
+      color: #cccccc;
+      background-color: #1a1a1a;
+    }
+
+    @media (max-width: 768px) {
+      .navbar {
+        padding: 0.675rem 1.35rem;
+      }
+
+      .brand-wrapper {
+        padding-left: 2.7rem;
+      }
+
+      .section {
+        padding: 1.35rem;
+        transform: scale(1);
+      }
+
+      .sms-table th, .sms-table td {
+        padding: 0.54rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        padding: 4.5rem 0.675rem 0 0.675rem;
+      }
+
+      .section {
+        padding: 0.9rem;
+      }
+
+      .sms-table th, .sms-table td {
+        font-size: 0.81rem;
+        padding: 0.45rem;
+      }
+
+      .sidebar {
+        width: 80%;
+        max-width: 200px;
+        padding-top: 5rem;
+      }
+
+      .sidebar li {
+        padding: 0.54rem 0.9rem;
+      }
+
+      .sidebar a {
+        font-size: 0.9rem;
+      }
+
+      .menu-wrapper {
+        top: 6px;
+        left: 6px;
+      }
+
+      .hamburger {
+        font-size: 1.2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="menu-wrapper">
+    <div class="hamburger" id="hamburger">☰</div>
+  </div>
+  <div class="sidebar" id="sidebar">
+    <ul>
+      <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+      <li><a href="{{ url_for('view_sms_status') }}">View Status of Sent SMS</a></li>
+      <li><a href="{{ url_for('sms_forwarding') }}">SMS Forwarding</a></li>
+      <li><a href="{{ url_for('inbox') }}">Inbox</a></li>
+    </ul>
+  </div>
+  <nav class="navbar">
+    <div class="brand-wrapper">
+      <a class="brand" href="{{ url_for('dashboard') }}">CallNowUsa</a>
+    </div>
+    <div class="nav-links">
+      <a href="{{ url_for('logout') }}">Log out</a>
+    </div>
+  </nav>
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-messages">
+          {% for category, message in messages %}
+            <p class="flash flash-{{ category }}">{{ message }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    <section class="section">
+      <h2 style="margin-bottom: 0.9rem;">Sent SMS Status</h2>
+      <div class="table-wrapper">
+        <table class="sms-table">
+          <thead>
+            <tr>
+              <th>Recipient</th>
+              <th>Message</th>
+              <th>Status</th>
+              <th>Date Sent</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for sms in sms_list %}
+              <tr>
+                <td>{{ sms.to }}</td>
+                <td>{{ sms.body }}</td>
+                <td>{{ sms.status }}</td>
+                <td>{{ sms.date_sent }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <footer>
+    © 2025 CallNowUsa. All rights reserved.
+  </footer>
+  <script>
+    document.getElementById('hamburger').addEventListener('click', function() {
+      document.getElementById('sidebar').classList.toggle('active');
+    });
+
+    document.querySelectorAll('.flash').forEach(flash => {
+      setTimeout(() => flash.style.display = 'none', 5000);
+    });
+  </script>
+</body>
+</html>

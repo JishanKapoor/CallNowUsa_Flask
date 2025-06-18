@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>CallNowUsa - SMS Forwarding</title>
+  <meta name="description" content="Manage SMS forwarding conditions" />
+  <meta name="theme-color" content="#090909" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background-color: #090909;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .menu-wrapper {
+      position: fixed;
+      top: 8.1px;
+      left: 8.1px;
+      z-index: 1100;
+    }
+
+    .hamburger {
+      font-size: 1.35rem;
+      cursor: pointer;
+      color: #ffffff;
+    }
+
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: -100%;
+      width: 80%;
+      max-width: 250px;
+      height: 100%;
+      background-color: #1a1a1a;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+      transition: left 0.3s ease;
+      z-index: 1000;
+      padding-top: 4.5rem;
+    }
+
+    .sidebar.active {
+      left: 0;
+    }
+
+    .sidebar ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .sidebar li {
+      padding: 0.9rem 1.35rem;
+    }
+
+    .sidebar a {
+      text-decoration: none;
+      color: #ffffff;
+      font-weight: 500;
+      display: block;
+    }
+
+    .sidebar a:hover {
+      color: #cccccc;
+    }
+
+    .navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 0.9rem 1.8rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: #1a1a1a;
+      z-index: 1001;
+    }
+
+    .brand-wrapper {
+      padding-left: 2.7rem;
+    }
+
+    .brand {
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1.125rem;
+      color: #ffffff;
+    }
+
+    .nav-links a {
+      text-decoration: none;
+      font-weight: 500;
+      color: #ffffff;
+    }
+
+    .container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 5.4rem 0.9rem 0 0.9rem;
+      min-height: calc(100vh - 5.4rem);
+    }
+
+    .section {
+      width: 100%;
+      max-width: 540px;
+      background-color: #1a1a1a;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      margin: 0 auto;
+      transform: scale(0.9);
+      transform-origin: top center;
+    }
+
+    footer {
+      text-align: center;
+      padding: 0.9rem;
+      font-size: 0.81rem;
+      color: #cccccc;
+      background-color: #1a1a1a;
+    }
+
+    .forwarding-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+      margin-bottom: 1.8rem;
+    }
+
+    .forwarding-form input {
+      padding: 0.675rem;
+      border: 1px solid #444;
+      border-radius: 5.4px;
+      background-color: #2a2a2a;
+      color: #ffffff;
+      font-size: 0.9rem;
+    }
+
+    .forwarding-form button {
+      padding: 0.675rem;
+      background-color: #7180FF;
+      color: #ffffff;
+      border: none;
+      border-radius: 5.4px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background-color 0.2s ease;
+    }
+
+    .forwarding-form button:hover {
+      background-color: #5e6bff;
+    }
+
+    .forwarding-form button:disabled {
+      background-color: #007BFF;
+      cursor: not-allowed;
+    }
+
+    .forwarding-list {
+      margin-top: 1.8rem;
+    }
+
+    .forwarding-item {
+      position: relative;
+      padding: 1rem;
+      border: 1px solid #333;
+      border-radius: 5.4px;
+      margin-bottom: 0.45rem;
+      background-color: #222;
+    }
+
+    .forwarding-item span {
+      color: #cccccc;
+      font-size: 0.9rem;
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .forwarding-item .remove-text {
+      color: #cccccc;
+      font-size: 0.8rem;
+      display: block;
+      margin-top: 0.2rem;
+      cursor: pointer;
+      transition: color 0.2s ease;
+    }
+
+    .forwarding-item .remove-text:hover {
+      color: #ffffff;
+    }
+
+    .forwarding-item .remove-text:disabled {
+      color: #666;
+      cursor: not-allowed;
+    }
+
+    .loading-text {
+      color: #cccccc;
+      font-size: 0.9rem;
+      margin-top: 0.45rem;
+    }
+
+    @media (max-width: 768px) {
+      .navbar {
+        padding: 0.675rem 1.35rem;
+      }
+
+      .brand-wrapper {
+        padding-left: 2.7rem;
+      }
+
+      .section {
+        padding: 1.35rem;
+        transform: scale(1);
+      }
+
+      .forwarding-item {
+        padding: 0.75rem;
+      }
+
+      .forwarding-item span {
+        font-size: 0.81rem;
+      }
+
+      .forwarding-item .remove-text {
+        font-size: 0.75rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        padding: 4.5rem 0.675rem 0 0.675rem;
+      }
+
+      .section {
+        padding: 0.9rem;
+      }
+
+      .forwarding-form input,
+      .forwarding-form button {
+        font-size: 0.81rem;
+        padding: 0.54rem;
+      }
+
+      .sidebar {
+        width: 80%;
+        max-width: 200px;
+        padding-top: 5rem;
+      }
+
+      .sidebar li {
+        padding: 0.54rem 0.9rem;
+      }
+
+      .sidebar a {
+        font-size: 0.9rem;
+      }
+
+      .menu-wrapper {
+        top: 6px;
+        left: 6px;
+      }
+
+      .hamburger {
+        font-size: 1.2rem;
+      }
+
+      .forwarding-item {
+        padding: 0.5rem;
+      }
+
+      .forwarding-item .remove-text {
+        font-size: 0.7rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="menu-wrapper">
+    <div class="hamburger" id="hamburger">☰</div>
+  </div>
+  <div class="sidebar" id="sidebar">
+    <ul>
+      <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+      <li><a href="{{ url_for('view_sms_status') }}">View Status of Sent SMS</a></li>
+      <li><a href="{{ url_for('sms_forwarding') }}">SMS Forwarding</a></li>
+      <li><a href="{{ url_for('inbox') }}">Inbox</a></li>
+    </ul>
+  </div>
+  <nav class="navbar">
+    <div class="brand-wrapper">
+      <a class="brand" href="{{ url_for('dashboard') }}">CallNowUsa</a>
+    </div>
+    <div class="nav-links">
+      <a href="{{ url_for('logout') }}">Log out</a>
+    </div>
+  </nav>
+  <main class="container">
+    <section class="section">
+      <h2 style="margin-bottom: 0.9rem;">SMS Transfer Conditions</h2>
+      <div class="forwarding-form">
+        <input type="tel" id="from_number" placeholder="From Number (+1XXXXXXXXXX)" pattern="\+1[0-9]{10}" required>
+        <input type="tel" id="to_number" placeholder="To Number (+1XXXXXXXXXX)" pattern="\+1[0-9]{10}" required>
+        <button id="save-btn" onclick="addForwarding()" disabled>Save</button>
+        <span id="loading-text" class="loading-text" style="display: none;">Saving...</span>
+      </div>
+      <div class="forwarding-list" id="forwarding-list">
+        {% for forwarding in forwarding_list %}
+          <div class="forwarding-item" data-from="{{ forwarding.from_number }}" data-to="{{ forwarding.to_number }}">
+            <span>From: {{ forwarding.from_number }} To: {{ forwarding.to_number }}</span>
+            <span class="remove-text" onclick="removeForwarding(this)">Remove</span>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+  </main>
+  <footer>
+    © 2025 CallNowUsa. All rights reserved.
+  </footer>
+  <script>
+    document.getElementById('hamburger').addEventListener('click', function() {
+      var sidebar = document.getElementById('sidebar');
+      sidebar.classList.toggle('active');
+    });
+
+    const saveBtn = document.getElementById('save-btn');
+    const loadingText = document.getElementById('loading-text');
+    const fromInput = document.getElementById('from_number');
+    const toInput = document.getElementById('to_number');
+
+    function validateInputs() {
+      const phoneRegex = /^\+1[0-9]{10}$/;
+      const isValid = phoneRegex.test(fromInput.value) && phoneRegex.test(toInput.value);
+      saveBtn.disabled = !isValid;
+    }
+
+    fromInput.addEventListener('input', validateInputs);
+    toInput.addEventListener('input', validateInputs);
+
+    function addForwarding() {
+      const fromNumber = fromInput.value;
+      const toNumber = toInput.value;
+      const phoneRegex = /^\+1[0-9]{10}$/;
+
+      if (!phoneRegex.test(fromNumber) || !phoneRegex.test(toNumber)) {
+        alert('Both numbers must start with +1 followed by 10 digits (e.g., +12345678901).');
+        return;
+      }
+
+      saveBtn.disabled = true;
+      loadingText.style.display = 'block';
+
+      fetch('{{ url_for("sms_forwarding") }}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ from_number: fromNumber, to_number: toNumber }),
+      })
+      .then(response => response.json())
+      .then(data => {
+        loadingText.style.display = 'none';
+        saveBtn.disabled = false;
+
+        if (data.success) {
+          const forwardingList = document.getElementById('forwarding-list');
+          const forwardingItem = document.createElement('div');
+          forwardingItem.className = 'forwarding-item';
+          forwardingItem.dataset.from = fromNumber;
+          forwardingItem.dataset.to = toNumber;
+          forwardingItem.innerHTML = `
+            <span>From: ${fromNumber} To: ${toNumber}</span>
+            <span class="remove-text" onclick="removeForwarding(this)">Remove</span>
+          `;
+          forwardingList.prepend(forwardingItem);
+
+          fromInput.value = '';
+          toInput.value = '';
+          saveBtn.disabled = true;
+        } else {
+          alert(data.error || 'Failed to save forwarding rule.');
+        }
+      })
+      .catch(error => {
+        loadingText.style.display = 'none';
+        saveBtn.disabled = false;
+        alert('Error saving forwarding rule: ' + error.message);
+      });
+    }
+
+    function removeForwarding(element) {
+      const forwardingItem = element.parentElement;
+      const fromNumber = forwardingItem.dataset.from;
+      const toNumber = forwardingItem.dataset.to;
+
+      element.classList.add('disabled');
+      element.textContent = 'Removing...';
+
+      fetch('{{ url_for("sms_forwarding") }}', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ from_number: fromNumber, to_number: toNumber }),
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          forwardingItem.remove();
+        } else {
+          alert(data.error || 'Failed to remove forwarding rule.');
+          element.classList.remove('disabled');
+          element.textContent = 'Remove';
+        }
+      })
+      .catch(error => {
+        alert('Error removing forwarding rule: ' + error.message);
+        element.classList.remove('disabled');
+        element.textContent = 'Remove';
+      });
+    }
+  </script>
+</body>
+</html>
