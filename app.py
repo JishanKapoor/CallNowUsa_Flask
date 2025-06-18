@@ -19,11 +19,16 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key'
+from dotenv import load_dotenv
+import os
 
-account_sid = 'SID_d5cf1823-5664-42cc-b6b6-fb10bcdaec56'
-auth_token = 'AUTH_aaa784bc-a599-499f-946b-ba7115c59726'
-CALLNOWUSA_NUMBER = 'default'
+load_dotenv()
+
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+account_sid = os.getenv('ACCOUNT_SID')
+auth_token = os.getenv('AUTH_TOKEN')
+CALLNOWUSA_NUMBER = os.getenv('CALLNOWUSA_NUMBER')
+
 
 client = Client(account_sid, auth_token, CALLNOWUSA_NUMBER)
 
@@ -742,10 +747,10 @@ def handle_exception(e):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-        if not User.query.filter_by(email='admin@example.com').first():
+        if not User.query.filter_by(email='admin@gmail.com').first():
             admin = User(
-                email='kapoorjishan2@gmail.com',
-                password=generate_password_hash('jishan1010', method='pbkdf2:sha256'),
+                email=os.getenv('ADMIN_EMAIL'),
+                password=generate_password_hash(os.getenv('ADMIN_PASSWORD'), method='pbkdf2:sha256'),
                 is_admin=True
             )
             db.session.add(admin)
