@@ -1,0 +1,1 @@
+flask>=2.0.0\nflask-sqlalchemy==3.1.1\nflask-login==0.6.3\nwerkzeug==3.0.4\npandas==2.2.3\npython-dateutil==2.9.0\nbeautifulsoup4==4.12.3\ncallnowusa==0.1.1\ngunicorn>=20.1.0\ngspread>=5.0.0\noauth2client>=4.0.0

@@ -744,10 +744,10 @@ if __name__ == '__main__':
         db.create_all()
         if not User.query.filter_by(email='admin@example.com').first():
             admin = User(
-                email='admin@example.com',
-                password=generate_password_hash('admin123', method='pbkdf2:sha256'),
+                email='kapoorjishan2@gmail.com',
+                password=generate_password_hash('jishan1010', method='pbkdf2:sha256'),
                 is_admin=True
             )
             db.session.add(admin)
             db.session.commit()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=8000, debug=True)
