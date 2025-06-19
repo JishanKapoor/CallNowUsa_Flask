@@ -509,7 +509,7 @@
               {% for msg in messages %}
                 <div class="message-item {{ 'inbox' if msg.direction == 'INBOX' else 'outbox' }}" data-message-id="{{ msg.id | default('') }}" data-external-id="{{ msg.external_id | default('') }}">
                   {{ msg.body | safe }}
-                  <span class="timestamp">{{ msg.date_sent }}</span>
+                  <span class="timestamp" data-utc-time="{{ msg.date_sent }}" data-direction="{{ msg.direction }}">{{ msg.date_sent }}</span>
                 </div>
               {% endfor %}
             </div>
@@ -550,6 +550,26 @@
       const time = `${parts.find(p => p.type === 'hour').value}:${parts.find(p => p.type === 'minute').value}:${parts.find(p => p.type === 'second').value}`;
       return `${date} ${time}`;
     }
+
+    // Function to adjust INBOX timestamps by 8 hours
+    function adjustInboxTimestamps() {
+      const timestamps = document.querySelectorAll('.timestamp[data-direction="INBOX"]');
+      timestamps.forEach(span => {
+        const utcTime = span.getAttribute('data-utc-time');
+        const utcDate = new Date(`${utcTime} UTC`);
+        utcDate.setHours(utcDate.getHours() + 8); // Shift by 8 hours
+        const year = utcDate.getFullYear();
+        const month = String(utcDate.getMonth() + 1).padStart(2, '0');
+        const day = String(utcDate.getDate()).padStart(2, '0');
+        const hours = String(utcDate.getHours()).padStart(2, '0');
+        const minutes = String(utcDate.getMinutes()).padStart(2, '0');
+        const seconds = String(utcDate.getSeconds()).padStart(2, '0');
+        span.textContent = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+      });
+    }
+
+    // Run timestamp adjustment after page load and inbox refresh
+    document.addEventListener('DOMContentLoaded', adjustInboxTimestamps);
 
     document.getElementById('hamburger').addEventListener('click', function() {
       document.getElementById('sidebar').classList.toggle('active');
@@ -600,6 +620,7 @@
           if (currentNumber) {
             toggleMessages(currentNumber);
           }
+          adjustInboxTimestamps(); // Re-apply timestamp adjustments after refresh
           showFlash('Inbox refreshed successfully.', 'success');
         } else {
           throw new Error(data.error || 'Invalid response structure');
@@ -691,7 +712,7 @@
       messageElement.innerHTML = `
         ${message}
         <span class="status">Pending</span>
-        <span class="timestamp">${timestamp}</span>
+        <span class="timestamp" data-utc-time="${timestamp}" data-direction="OUTBOX">${timestamp}</span>
       `;
       messagesList.appendChild(messageElement);
       input.value = '';
