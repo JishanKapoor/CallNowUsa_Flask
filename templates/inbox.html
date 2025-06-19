@@ -508,7 +508,7 @@
             <div class="messages-list" id="messages-{{ number }}">
               {% for msg in messages %}
                 <div class="message-item {{ 'inbox' if msg.direction == 'INBOX' else 'outbox' }}" data-message-id="{{ msg.id | default('') }}" data-external-id="{{ msg.external_id | default('') }}">
-                  {{ msg.body }}
+                  {{ msg.body | safe }}
                   <span class="timestamp">{{ msg.date_sent }}</span>
                 </div>
               {% endfor %}
@@ -530,6 +530,26 @@
     let currentNumber = null;
     const messageQueue = {};
     let isRefreshing = false;
+
+    // Function to format date in America/Toronto timezone
+    function getTorontoTimestamp() {
+      const now = new Date();
+      const options = {
+        timeZone: 'America/Toronto',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      };
+      const formatter = new Intl.DateTimeFormat('en-CA', options);
+      const parts = formatter.formatToParts(now);
+      const date = `${parts.find(p => p.type === 'year').value}-${parts.find(p => p.type === 'month').value}-${parts.find(p => p.type === 'day').value}`;
+      const time = `${parts.find(p => p.type === 'hour').value}:${parts.find(p => p.type === 'minute').value}:${parts.find(p => p.type === 'second').value}`;
+      return `${date} ${time}`;
+    }
 
     document.getElementById('hamburger').addEventListener('click', function() {
       document.getElementById('sidebar').classList.toggle('active');
@@ -661,7 +681,7 @@
       }
 
       const localMessageId = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+      const timestamp = getTorontoTimestamp();
 
       const messageElement = document.createElement('div');
       messageElement.className = 'message-item outbox pending';
