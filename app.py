@@ -780,7 +780,6 @@ def unauthorized_callback():
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('error.html', message="Page Not Found"), 404
-    
 
 @app.errorhandler(401)
 def unauthorized(e):
