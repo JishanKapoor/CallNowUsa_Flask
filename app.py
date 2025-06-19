@@ -1555,10 +1555,18 @@ def refresh_inbox():
         logger.debug(f"Sorted phone numbers: {list(sorted_inbox.keys())}")
 
         logger.debug(f"Fetched {len(inbox_messages)} inbox messages for user {current_user.id}")
+        # Render inbox.html but extract only the numbers-list content
         rendered_html = render_template('inbox.html', inbox_data=sorted_inbox)
+        soup = BeautifulSoup(rendered_html, 'html.parser')
+        numbers_list = soup.find('div', id='numbers-list')
+        if numbers_list:
+            numbers_list_html = str(numbers_list.decode_contents())
+        else:
+            logger.error("Failed to find numbers-list div in rendered HTML")
+            numbers_list_html = ""
         return jsonify({
             'success': True,
-            'html': rendered_html
+            'html': numbers_list_html
         })
     except Exception as e:
         logger.error(f"Failed to refresh inbox: {str(e)}")
