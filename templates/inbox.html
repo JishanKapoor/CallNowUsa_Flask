@@ -589,6 +589,7 @@
         card.classList.add('active');
         currentNumber = number;
         const messagesList = document.getElementById(`messages-${number}`);
+        // Force scroll to bottom to show latest message
         setTimeout(() => {
           messagesList.scrollTop = messagesList.scrollHeight;
         }, 0);
@@ -618,24 +619,7 @@
       })
       .then(data => {
         if (data.success && data.html) {
-          // Debug: Log the received HTML to verify content
-          console.log('Received HTML:', data.html);
-          
-          // Sanitize HTML to ensure only numbers-list content is used
-          const tempDiv = document.createElement('div');
-          tempDiv.innerHTML = data.html;
-          // Remove any unexpected inbox-section or inbox-header elements
-          const inboxSection = tempDiv.querySelector('.inbox-section');
-          const inboxHeader = tempDiv.querySelector('.inbox-header');
-          if (inboxSection) {
-            inboxSection.remove();
-          }
-          if (inboxHeader) {
-            inboxHeader.remove();
-          }
-          // Insert only the sanitized content (number-card and conversation-dropdown)
-          document.getElementById('numbers-list').innerHTML = tempDiv.innerHTML;
-          
+          document.getElementById('numbers-list').innerHTML = data.html;
           if (currentNumber) {
             toggleMessages(currentNumber);
           }
