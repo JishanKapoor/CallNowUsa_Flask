@@ -11,7 +11,8 @@ from flask_login import (
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.exc import IntegrityError
 from callnowusa import Client
-from datetime import datetime, timezone
+from datetime import datetime
+import pytz
 from dateutil import parser
 from bs4 import BeautifulSoup
 
@@ -23,12 +24,18 @@ from dotenv import load_dotenv
 import os
 
 load_dotenv()
-
+toronto_tz = pytz.timezone('America/Toronto')
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+logging.Formatter.converter = lambda *args: datetime.now(toronto_tz).timetuple()
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 account_sid = os.getenv('ACCOUNT_SID')
 auth_token = os.getenv('AUTH_TOKEN')
 CALLNOWUSA_NUMBER = os.getenv('CALLNOWUSA_NUMBER')
-
 
 client = Client(account_sid, auth_token, CALLNOWUSA_NUMBER)
 
@@ -44,6 +51,9 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'sign-in'
 login_manager.login_message = None
+logger = logging.getLogger(__name__)
+toronto_tz = pytz.timezone('America/Toronto')
+logging.Formatter.converter = lambda *args: datetime.now(toronto_tz).timetuple()
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -62,14 +72,14 @@ class SentMessage(db.Model):
     to_number = db.Column(db.String(20), nullable=False)
     body = db.Column(db.Text, nullable=False)
     status = db.Column(db.String(100), default='pending')
-    date_sent = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    date_sent = db.Column(db.DateTime, default=lambda: datetime.now(toronto_tz))
 
 class SMSForwarding(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     from_number = db.Column(db.String(20), nullable=False)
     to_number = db.Column(db.String(20), nullable=False)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(toronto_tz))
 
 class InboxMessage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -79,7 +89,7 @@ class InboxMessage(db.Model):
     direction = db.Column(db.String(10), nullable=False)  # INBOX or OUTBOX
     date_sent = db.Column(db.DateTime, nullable=False)
     external_id = db.Column(db.String(100), nullable=True)
-    __table_args__ = (db.UniqueConstraint('user_id', 'from_number', 'body', 'date_sent', name='uix_inbox_message'),)
+    __table_args__ = (db.UniqueConstraint('user_id', 'from_number', 'body', 'date_sent', 'direction', name='uix_inbox_message'),)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -169,6 +179,9 @@ def select_phone():
 
     assigned_ids = [user.phone_number_id for user in User.query.filter(User.phone_number_id.isnot(None)).all()]
     phone_numbers = PhoneNumber.query.filter(~PhoneNumber.id.in_(assigned_ids)).all()
+    if not phone_numbers:
+        flash('No available phone numbers. Please contact an administrator.', 'error')
+        return render_template('select_phone.html', phone_numbers=[])
     return render_template('select_phone.html', phone_numbers=phone_numbers)
 
 @app.route('/admin', methods=['GET', 'POST'])
@@ -260,7 +273,7 @@ def send_sms():
         to_number=to_number,
         body=body,
         status='pending',
-        date_sent=datetime.now(timezone.utc)
+        date_sent=datetime.now(toronto_tz)
     )
     db.session.add(new_message)
     db.session.commit()
@@ -396,7 +409,8 @@ def upload_sms():
                 user_id=current_user.id,
                 to_number=to_number,
                 body=message,
-                status='pending'
+                status='pending',
+                date_sent=datetime.now(toronto_tz)
             )
             db.session.add(new_message)
             messages.append(new_message)
@@ -581,13 +595,22 @@ def sms_forwarding():
 @login_required
 def inbox():
     if not current_user.is_admin and not current_user.phone_number_id:
+        flash('No phone number assigned. Please select a phone number.', 'error')
         return redirect(url_for('select_phone'))
 
     try:
+        phone_number = db.session.get(PhoneNumber, current_user.phone_number_id)
+        if not phone_number:
+            logger.error(f"No phone number found for phone_number_id: {current_user.phone_number_id}")
+            flash('Assigned phone number not found. Please contact an administrator.', 'error')
+            return redirect(url_for('select_phone'))
+
+        # Fetch messages from database
         inbox_messages = InboxMessage.query.filter_by(user_id=current_user.id).all()
         inbox_data = {}
+
         for msg in inbox_messages:
-            number = msg.from_number if msg.direction == 'INBOX' else msg.from_number
+            number = msg.from_number
             if number not in inbox_data:
                 inbox_data[number] = []
             inbox_data[number].append({
@@ -600,13 +623,15 @@ def inbox():
                 'external_id': msg.external_id
             })
 
+        # Sort messages within each number by date_sent (ascending, so latest at bottom)
         for number in inbox_data:
             inbox_data[number].sort(key=lambda x: x['raw_date_sent'])
             logger.debug(f"Sorted messages for {number}: {len(inbox_data[number])} messages")
 
+        # Sort numbers by the most recent message (descending, so latest at top)
         sorted_inbox = dict(sorted(
             inbox_data.items(),
-            key=lambda x: x[1][-1]['raw_date_sent'] if x[1] else datetime.min.replace(tzinfo=timezone.utc),
+            key=lambda x: x[1][-1]['raw_date_sent'] if x[1] else datetime.min.replace(tzinfo=toronto_tz),
             reverse=True
         ))
         logger.debug(f"Sorted phone numbers: {list(sorted_inbox.keys())}")
@@ -627,8 +652,8 @@ def refresh_inbox():
     try:
         phone_number = db.session.get(PhoneNumber, current_user.phone_number_id)
         if not phone_number:
-            logger.error("No phone number assigned to user")
-            return jsonify({'success': False, 'error': 'No phone number assigned.'}), 400
+            logger.error(f"No phone number found for phone_number_id: {current_user.phone_number_id}")
+            return jsonify({'success': False, 'error': 'Assigned phone number not found.'}), 400
 
         logger.debug(f"Checking inbox for number: {phone_number.number}")
         inbox_response = client.check_inbox(from_=phone_number.number)
@@ -636,53 +661,77 @@ def refresh_inbox():
         logger.debug(f"Inbox API response: {new_messages}")
 
         messages = []
-        if 'status' in new_messages and isinstance(new_messages['status'], str):
-            status_match = re.match(r'\[\+1\d{10}:"(.+?)" received (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]', new_messages['status'])
-            if status_match:
-                body = status_match.group(1)
-                date_str = status_match.group(2)
-                from_number = new_messages['status'].split(':')[0][1:]
-                date_sent = parser.parse(date_str).replace(tzinfo=timezone.utc)
-                messages.append({
-                    'from_number': from_number,
-                    'body': body,
-                    'date_sent': date_sent,
-                    'sid': new_messages.get('sid', '')
-                })
+        # Handle API response: status is a string like "[+number:\"body\" sent/received timestamp], ..."
+        if isinstance(new_messages.get('status'), str):
+            # Split by '], [' to separate messages, handling first and last brackets
+            message_strings = new_messages['status'].strip('[]').split('], [')
+            for msg_str in message_strings:
+                msg_str = msg_str.strip()
+                # Regex to match: +number:"body" sent/received timestamp
+                match = re.match(r'(\+\d{11}):"(.+?)"\s+(sent|received)\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})', msg_str, re.IGNORECASE)
+                if match:
+                    from_number = match.group(1)
+                    body = match.group(2)
+                    direction = 'OUTBOX' if match.group(3).lower() == 'sent' else 'INBOX'
+                    date_sent = parser.parse(match.group(4)).replace(tzinfo=pytz.UTC).astimezone(toronto_tz)
+                    messages.append({
+                        'from_number': from_number,
+                        'body': body,
+                        'direction': direction,
+                        'date_sent': date_sent,
+                        'sid': new_messages.get('sid', '')
+                    })
+                else:
+                    logger.warning(f"Failed to parse message string: {msg_str}")
+        else:
+            logger.warning(f"Unexpected status format in API response: {new_messages.get('status')}")
 
+        # Store new messages in database
         for msg in messages:
             from_number = msg['from_number'].strip()
             body = msg['body'].strip()
+            direction = msg['direction']
             date_sent = msg['date_sent']
-            external_id = msg['sid']
+            external_id = msg['sid'] or f"{direction.lower()}_{from_number}_{date_sent.strftime('%Y%m%d%H%M%S')}"
 
             existing = InboxMessage.query.filter_by(
                 user_id=current_user.id,
                 from_number=from_number,
                 body=body,
-                date_sent=date_sent
+                date_sent=date_sent,
+                direction=direction
             ).first()
-            if not existing:
+            if existing:
+                # Update external_id if it has changed
+                if existing.external_id != external_id:
+                    existing.external_id = external_id
+                    db.session.commit()
+                    logger.debug(f"Updated external_id for existing {direction} message from {from_number}: {body}")
+                else:
+                    logger.debug(f"Skipped duplicate {direction} message from {from_number}: {body}")
+            else:
                 inbox_message = InboxMessage(
                     user_id=current_user.id,
                     from_number=from_number,
                     body=body,
-                    direction='INBOX',
+                    direction=direction,
                     date_sent=date_sent,
                     external_id=external_id
                 )
                 try:
                     db.session.add(inbox_message)
                     db.session.commit()
-                    logger.debug(f"Added new inbox message from {from_number}: {body}")
+                    logger.debug(f"Added new {direction} message from {from_number}: {body}")
                 except IntegrityError:
                     db.session.rollback()
-                    logger.debug(f"Skipped duplicate message from {from_number}: {body}")
+                    logger.debug(f"IntegrityError on {direction} message from {from_number}: {body}, likely duplicate")
 
+        # Fetch all messages from database to display
         inbox_messages = InboxMessage.query.filter_by(user_id=current_user.id).all()
         inbox_data = {}
+
         for msg in inbox_messages:
-            number = msg.from_number if msg.direction == 'INBOX' else msg.from_number
+            number = msg.from_number
             if number not in inbox_data:
                 inbox_data[number] = []
             inbox_data[number].append({
@@ -695,28 +744,25 @@ def refresh_inbox():
                 'external_id': msg.external_id
             })
 
+        # Sort messages within each number by date_sent (ascending, so latest at bottom)
         for number in inbox_data:
             inbox_data[number].sort(key=lambda x: x['raw_date_sent'])
             logger.debug(f"Sorted messages for {number}: {len(inbox_data[number])} messages")
 
+        # Sort numbers by the most recent message (descending, so latest at top)
         sorted_inbox = dict(sorted(
             inbox_data.items(),
-            key=lambda x: x[1][-1]['raw_date_sent'] if x[1] else datetime.min.replace(tzinfo=timezone.utc),
+            key=lambda x: x[1][-1]['raw_date_sent'] if x[1] else datetime.min.replace(tzinfo=toronto_tz),
             reverse=True
         ))
         logger.debug(f"Sorted phone numbers: {list(sorted_inbox.keys())}")
 
         logger.debug(f"Fetched {len(inbox_messages)} inbox messages for user {current_user.id}")
         rendered_html = render_template('inbox.html', inbox_data=sorted_inbox)
-        soup = BeautifulSoup(rendered_html, 'html.parser')
-        numbers_list = soup.find(id='numbers-list')
-        if numbers_list:
-            return jsonify({
-                'success': True,
-                'html': str(numbers_list)
-            })
-        else:
-            raise Exception('Failed to extract numbers-list from rendered HTML')
+        return jsonify({
+            'success': True,
+            'html': rendered_html
+        })
     except Exception as e:
         logger.error(f"Failed to refresh inbox: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
