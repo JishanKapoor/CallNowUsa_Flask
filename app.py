@@ -1555,7 +1555,7 @@ def refresh_inbox():
         logger.debug(f"Sorted phone numbers: {list(sorted_inbox.keys())}")
 
         logger.debug(f"Fetched {len(inbox_messages)} inbox messages for user {current_user.id}")
-        rendered_html = render_template('inbox_numbers.html', inbox_data=sorted_inbox)
+        rendered_html = render_template('inbox.html', inbox_data=sorted_inbox)
         return jsonify({
             'success': True,
             'html': rendered_html
