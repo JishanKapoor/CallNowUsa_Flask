@@ -1629,15 +1629,6 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-load_dotenv()
-toronto_tz = pytz.timezone('America/Toronto')
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-logger = logging.getLogger(__name__)
-logging.Formatter.converter = lambda *args: datetime.now(toronto_tz).timetuple()
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 account_sid = os.getenv('ACCOUNT_SID')
 auth_token = os.getenv('AUTH_TOKEN')
@@ -1657,6 +1648,8 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'sign-in'
 login_manager.login_message = None
+
+toronto_tz = pytz.timezone('America/Toronto')
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -1701,14 +1694,6 @@ def load_user(user_id):
 @app.route('/')
 def index():
     return redirect(url_for('dashboard'))
-
-@app.route('/register.html')
-def redirect_register_html():
-    return redirect(url_for('register'))
-
-@app.route('/sign-in.html')
-def redirect_sign_in_html():
-    return redirect(url_for('sign-in'))
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -1845,7 +1830,6 @@ def admin_panel():
 def dashboard():
     if not current_user.is_admin and not current_user.phone_number_id:
         return redirect(url_for('select_phone'))
-    logger.debug(f"Rendering dashboard, session flashes: {session.get('_flashes', [])}")
     return render_template('dashboard.html')
 
 @app.route('/send_sms', methods=['POST'])
@@ -1859,7 +1843,6 @@ def send_sms():
 
     if not to_number or not body:
         flash('Phone number and message are required.', 'error')
-        logger.debug("Form validation failed: missing phone number or message")
         return jsonify({'success': False, 'error': 'Phone number and message are required.'}), 400
 
     if re.match(r'^1\d{10}$', to_number):
@@ -1868,7 +1851,6 @@ def send_sms():
         to_number = '+1' + to_number
     elif not re.match(r'^\+1\d{10}$', to_number):
         flash('Invalid phone number format.', 'error')
-        logger.debug(f"Invalid phone number format: {to_number}")
         return jsonify({'success': False, 'error': 'Invalid phone number: Use +1 followed by 10 digits, 10 digits alone, or 11 digits starting with 1.'}), 400
 
     new_message = SentMessage(
@@ -1880,23 +1862,19 @@ def send_sms():
     )
     db.session.add(new_message)
     db.session.commit()
-    logger.debug(f"Stored message in database with ID: {new_message.id}, status: {new_message.status}")
 
     external_id = f"outbox_{new_message.id}_{to_number}_{new_message.date_sent.strftime('%Y%m%d%H%M%S')}"
 
     try:
-        logger.debug(f"Sending SMS to {to_number} with body: {body}")
         message = client.messages.create(
             body=body,
             from_=CALLNOWUSA_NUMBER,
             to=to_number
         )
         response = message.fetch()
-        logger.debug(f"SMS sent successfully: {response}")
 
         new_message.status = response.status if hasattr(response, 'status') else 'sent'
         db.session.commit()
-        logger.debug(f"Updated message in database with status: {new_message.status}")
 
         inbox_message = InboxMessage(
             user_id=current_user.id,
@@ -1909,10 +1887,8 @@ def send_sms():
         try:
             db.session.add(inbox_message)
             db.session.commit()
-            logger.debug(f"Added sent message to inbox: {body}")
         except IntegrityError:
             db.session.rollback()
-            logger.debug(f"Skipped duplicate OUTBOX message to {to_number}: {body}")
 
         return jsonify({
             'success': True,
@@ -1921,7 +1897,6 @@ def send_sms():
             'external_id': external_id
         })
     except Exception as e:
-        logger.error(f"Failed to send SMS: {str(e)}")
         new_message.status = f"error: {str(e)}"
         db.session.commit()
         return jsonify({
@@ -1940,61 +1915,41 @@ def upload_sms():
 
     if 'file' not in request.files:
         flash('No file uploaded.', 'error')
-        logger.debug("No file uploaded in request.files")
         return redirect(url_for('dashboard'))
 
     file = request.files['file']
     if not file or not file.filename:
         flash('No file selected.', 'error')
-        logger.debug("No file selected or empty filename")
         return redirect(url_for('dashboard'))
 
     if not file.filename.lower().endswith(('.csv', '.xlsx', '.xls')):
         flash('File must be CSV or Excel (.csv, .xlsx, .xls).', 'error')
-        logger.debug(f"Invalid file type: {file.filename}")
         return redirect(url_for('dashboard'))
 
     try:
-        logger.debug(f"Received file: {file.filename}, size: {file.content_length} bytes")
         if file.filename.lower().endswith('.csv'):
             df = pd.read_csv(file, header=0, names=['Phone Number', 'Message'])
         else:
             df = pd.read_excel(file, header=0, names=['Phone Number', 'Message'], engine='openpyxl')
 
-        logger.debug(f"File parsed, rows: {len(df)}")
         if df.shape[1] != 2:
             flash('File must have exactly two columns: Phone Number and Message.', 'error')
-            logger.debug("Invalid file structure: incorrect number of columns")
             return redirect(url_for('dashboard'))
 
         flash("Processing uploaded file...", 'success')
-        logger.debug("Processing uploaded file")
-
         messages = []
         for index, row in df.iterrows():
             message = str(row['Message']).strip() if pd.notna(row['Message']) else ''
             to_number = str(row['Phone Number']).strip() if pd.notna(row['Phone Number']) else ''
 
-            if not message:
+            if not message or not to_number:
                 new_message = SentMessage(
                     user_id=current_user.id,
                     to_number=to_number,
                     body=message,
-                    status='error: Message is empty'
+                    status=f"error: {'Message' if not message else 'Phone number'} is empty"
                 )
                 db.session.add(new_message)
-                logger.debug(f"Row {index}: Message is empty")
-                continue
-
-            if not to_number:
-                new_message = SentMessage(
-                    user_id=current_user.id,
-                    to_number=to_number,
-                    body=message,
-                    status='error: Phone number is empty'
-                )
-                db.session.add(new_message)
-                logger.debug(f"Row {index}: Phone number is empty")
                 continue
 
             if re.match(r'^1\d{10}$', to_number):
@@ -2009,7 +1964,6 @@ def upload_sms():
                     status='error: Invalid phone number format'
                 )
                 db.session.add(new_message)
-                logger.debug(f"Row {index}: Invalid phone number format: {to_number}")
                 continue
 
             new_message = SentMessage(
@@ -2021,63 +1975,44 @@ def upload_sms():
             )
             db.session.add(new_message)
             messages.append(new_message)
-            logger.debug(f"Row {index}: Added message to database with status: pending")
 
         db.session.commit()
-        logger.debug("Committed all pending messages to database")
 
         for index, new_message in enumerate(messages):
             try:
-                logger.debug(f"Row {index}: Sending SMS to {new_message.to_number} with body: {new_message.body}")
                 api_message = client.messages.create(
                     body=new_message.body,
                     from_=CALLNOWUSA_NUMBER,
                     to=new_message.to_number
                 )
                 response = api_message.fetch()
-                logger.debug(f"Row {index}: SMS sent successfully: {response}")
 
                 new_message.status = response.status if hasattr(response, 'status') else 'sent'
                 db.session.commit()
-                logger.debug(f"Row {index}: Updated message in database with status: {new_message.status}")
 
                 external_id = f"outbox_{new_message.id}_{new_message.to_number}_{new_message.date_sent.strftime('%Y%m%d%H%M%S')}"
-                existing = InboxMessage.query.filter_by(
+                inbox_message = InboxMessage(
                     user_id=current_user.id,
                     from_number=new_message.to_number,
                     body=new_message.body,
-                    date_sent=new_message.date_sent
-                ).first()
-                if not existing:
-                    inbox_message = InboxMessage(
-                        user_id=current_user.id,
-                        from_number=new_message.to_number,
-                        body=new_message.body,
-                        direction='OUTBOX',
-                        date_sent=new_message.date_sent,
-                        external_id=external_id
-                    )
-                    try:
-                        db.session.add(inbox_message)
-                        db.session.commit()
-                        logger.debug(f"Row {index}: Added sent message to inbox: {new_message.body}")
-                    except IntegrityError:
-                        db.session.rollback()
-                        logger.debug(f"Row {index}: Skipped duplicate OUTBOX message to {new_message.to_number}: {new_message.body}")
+                    direction='OUTBOX',
+                    date_sent=new_message.date_sent,
+                    external_id=external_id
+                )
+                try:
+                    db.session.add(inbox_message)
+                    db.session.commit()
+                except IntegrityError:
+                    db.session.rollback()
             except Exception as e:
-                logger.error(f"Row {index}: Failed to send SMS: {str(e)}")
                 new_message.status = f"error: {str(e)}"
                 db.session.commit()
-                logger.debug(f"Row {index}: Updated message in database with status: {new_message.status}")
 
         flash("File processed successfully. Check View SMS Status for details.", 'success')
-        logger.debug("File processed successfully")
 
     except Exception as e:
-        logger.error(f"Failed to process file: {str(e)}")
         flash(f"Failed to process file: {str(e)}", 'error')
 
-    logger.debug(f"Redirecting to dashboard, session flashes: {session.get('_flashes', [])}")
     return redirect(url_for('dashboard'))
 
 @app.route('/view_sms_status')
@@ -2097,10 +2032,8 @@ def view_sms_status():
             }
             for msg in messages
         ]
-        logger.debug(f"Successfully fetched {len(sms_list)} messages for user {current_user.id}")
         return render_template('view_sms_status.html', sms_list=sms_list)
     except Exception as e:
-        logger.error(f"Failed to fetch SMS statuses: {str(e)}")
         flash(f"Failed to fetch SMS statuses: {str(e)}", 'error')
         return redirect(url_for('dashboard'))
 
@@ -2117,22 +2050,18 @@ def sms_forwarding():
 
         phone_regex = r'^\+1\d{10}$'
         if not (re.match(phone_regex, from_number) and re.match(phone_regex, to_number)):
-            logger.debug(f"Invalid phone number format: from={from_number}, to={to_number}")
             return jsonify({'success': False, 'error': 'Both numbers must start with +1 followed by 10 digits.'}), 400
 
         if SMSForwarding.query.filter_by(user_id=current_user.id, from_number=from_number, to_number=to_number).first():
-            logger.debug(f"Duplicate forwarding rule: from={from_number}, to={to_number}")
             return jsonify({'success': False, 'error': 'This forwarding rule already exists.'}), 400
 
         try:
-            logger.debug(f"Calling sms_forward: to_number={from_number}, to_number2={to_number}")
             message = client.sms_forward(
                 to_number=from_number,
                 to_number2=to_number,
                 from_=CALLNOWUSA_NUMBER
             )
             response = message.fetch()
-            logger.debug(f"sms_forward response: {response}")
 
             new_forwarding = SMSForwarding(
                 user_id=current_user.id,
@@ -2141,12 +2070,10 @@ def sms_forwarding():
             )
             db.session.add(new_forwarding)
             db.session.commit()
-            logger.debug(f"Saved forwarding rule: from={from_number}, to={to_number}")
             flash('Forwarding rule added successfully.', 'success')
             return jsonify({'success': True})
 
         except Exception as e:
-            logger.error(f"Failed to set up SMS forwarding: {str(e)}")
             db.session.rollback()
             return jsonify({'success': False, 'error': f"Failed to set up forwarding: {str(e)}"}), 500
 
@@ -2162,26 +2089,21 @@ def sms_forwarding():
         ).first()
 
         if not forwarding:
-            logger.debug(f"Forwarding rule not found: from={from_number}, to={to_number}")
             return jsonify({'success': False, 'error': 'Forwarding rule not found.'}), 404
 
         try:
-            logger.debug(f"Calling sms_forward_stop: to_number={from_number}, to_number2={to_number}")
             message = client.sms_forward_stop(
                 to_number=from_number,
                 to_number2=to_number,
                 from_=CALLNOWUSA_NUMBER
             )
             response = message.fetch()
-            logger.debug(f"sms_forward_stop response: {response}")
 
             db.session.delete(forwarding)
             db.session.commit()
-            logger.debug(f"Deleted forwarding rule: from={from_number}, to={to_number}")
             return jsonify({'success': True})
 
         except Exception as e:
-            logger.error(f"Failed to stop SMS forwarding: {str(e)}")
             db.session.rollback()
             return jsonify({'success': False, 'error': f"Failed to stop forwarding: {str(e)}"}), 500
 
@@ -2196,10 +2118,8 @@ def sms_forwarding():
                 }
                 for f in forwardings
             ]
-            logger.debug(f"Fetched {len(forwarding_list)} forwarding rules for user {current_user.id}")
             return render_template('sms_forwarding.html', forwarding_list=forwarding_list)
         except Exception as e:
-            logger.error(f"Failed to fetch forwarding rules: {str(e)}")
             return redirect(url_for('dashboard'))
 
 @app.route('/inbox', methods=['GET'])
@@ -2212,11 +2132,9 @@ def inbox():
     try:
         phone_number = db.session.get(PhoneNumber, current_user.phone_number_id)
         if not phone_number:
-            logger.error(f"No phone number found for phone_number_id: {current_user.phone_number_id}")
             flash('Assigned phone number not found. Please contact an administrator.', 'error')
             return redirect(url_for('select_phone'))
 
-        # Fetch messages grouped by from_number, sorted by date_sent ascending
         inbox_messages = InboxMessage.query.filter_by(user_id=current_user.id).order_by(InboxMessage.date_sent.asc()).all()
         inbox_data = {}
 
@@ -2234,18 +2152,14 @@ def inbox():
                 'external_id': msg.external_id
             })
 
-        # Sort numbers by the most recent message (descending, so latest at top)
         sorted_inbox = dict(sorted(
             inbox_data.items(),
             key=lambda x: x[1][-1]['raw_date_sent'] if x[1] else datetime.min.replace(tzinfo=toronto_tz),
             reverse=True
         ))
-        logger.debug(f"Sorted phone numbers: {list(sorted_inbox.keys())}")
 
-        logger.debug(f"Fetched {len(inbox_messages)} inbox messages for user {current_user.id}")
         return render_template('inbox.html', inbox_data=sorted_inbox)
     except Exception as e:
-        logger.error(f"Failed to fetch inbox messages: {str(e)}")
         flash(f"Error fetching inbox messages: {str(e)}", 'error')
         return redirect(url_for('dashboard'))
 
@@ -2258,13 +2172,10 @@ def refresh_inbox():
     try:
         phone_number = db.session.get(PhoneNumber, current_user.phone_number_id)
         if not phone_number:
-            logger.error(f"No phone number found for phone_number_id: {current_user.phone_number_id}")
             return jsonify({'success': False, 'error': 'Assigned phone number not found.'}), 400
 
-        logger.debug(f"Checking inbox for number: {phone_number.number}")
         inbox_response = client.check_inbox(from_=phone_number.number)
         new_messages = inbox_response.fetch()
-        logger.debug(f"Inbox API response: {new_messages}")
 
         messages = []
         if isinstance(new_messages.get('status'), str):
@@ -2276,7 +2187,7 @@ def refresh_inbox():
                     from_number = match.group(1)
                     body = match.group(2)
                     direction = 'OUTBOX' if match.group(3).lower() == 'sent' else 'INBOX'
-                    date_sent = parser.parse(match.group(4)).replace(tzinfo=pytz.UTC).astimezone(toronto_tz)
+                    date_sent = parser.parse(match.group(4))  # Treat as local Toronto time
                     messages.append({
                         'from_number': from_number,
                         'body': body,
@@ -2284,10 +2195,6 @@ def refresh_inbox():
                         'date_sent': date_sent,
                         'sid': new_messages.get('sid', '')
                     })
-                else:
-                    logger.warning(f"Failed to parse message string: {msg_str}")
-        else:
-            logger.warning(f"Unexpected status format in API response: {new_messages.get('status')}")
 
         for msg in messages:
             from_number = msg['from_number'].strip()
@@ -2307,9 +2214,6 @@ def refresh_inbox():
                 if existing.external_id != external_id:
                     existing.external_id = external_id
                     db.session.commit()
-                    logger.debug(f"Updated external_id for existing {direction} message from {from_number}: {body}")
-                else:
-                    logger.debug(f"Skipped duplicate {direction} message from {from_number}: {body}")
             else:
                 inbox_message = InboxMessage(
                     user_id=current_user.id,
@@ -2322,12 +2226,9 @@ def refresh_inbox():
                 try:
                     db.session.add(inbox_message)
                     db.session.commit()
-                    logger.debug(f"Added new {direction} message from {from_number}: {body}")
                 except IntegrityError:
                     db.session.rollback()
-                    logger.debug(f"IntegrityError on {direction} message from {from_number}: {body}, likely duplicate")
 
-        # Fetch all messages from database, sorted by date_sent
         inbox_messages = InboxMessage.query.filter_by(user_id=current_user.id).order_by(InboxMessage.date_sent.asc()).all()
         inbox_data = {}
 
@@ -2345,30 +2246,21 @@ def refresh_inbox():
                 'external_id': msg.external_id
             })
 
-        # Sort numbers by the most recent message (descending, so latest at top)
         sorted_inbox = dict(sorted(
             inbox_data.items(),
             key=lambda x: x[1][-1]['raw_date_sent'] if x[1] else datetime.min.replace(tzinfo=toronto_tz),
             reverse=True
         ))
-        logger.debug(f"Sorted phone numbers: {list(sorted_inbox.keys())}")
 
-        logger.debug(f"Fetched {len(inbox_messages)} inbox messages for user {current_user.id}")
-        # Render inbox.html but extract only the numbers-list content
         rendered_html = render_template('inbox.html', inbox_data=sorted_inbox)
         soup = BeautifulSoup(rendered_html, 'html.parser')
         numbers_list = soup.find('div', id='numbers-list')
-        if numbers_list:
-            numbers_list_html = str(numbers_list.decode_contents())
-        else:
-            logger.error("Failed to find numbers-list div in rendered HTML")
-            numbers_list_html = ""
+        numbers_list_html = str(numbers_list.decode_contents()) if numbers_list else ""
         return jsonify({
             'success': True,
             'html': numbers_list_html
         })
     except Exception as e:
-        logger.error(f"Failed to refresh inbox: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/logout')
@@ -2391,7 +2283,6 @@ def unauthorized(e):
 
 @app.errorhandler(Exception)
 def handle_exception(e):
-    logger.error(f"Unhandled exception: {str(e)}")
     return render_template('error.html', message="Internal Server Error"), 500
 
 if __name__ == '__main__':
@@ -2406,3 +2297,4 @@ if __name__ == '__main__':
             db.session.add(admin)
             db.session.commit()
     app.run(host='0.0.0.0', port=8000, debug=True)
+
